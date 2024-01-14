@@ -84,10 +84,13 @@ func sendMessageToClient(c *gin.Context) {
 	clientCh, chOK := clientMsgCh[clientID]
 	connMutex.RUnlock()
 
-	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No client with ID " + clientID})
+	if !ok || !chOK {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Client ID not found"})
 		return
 	}
+
+	// 清理消息通道中的残留数据
+	clearChannel(clientCh)
 
 	_, err := fmt.Fprintf(conn, message)
 	if err != nil {
@@ -95,17 +98,25 @@ func sendMessageToClient(c *gin.Context) {
 		return
 	}
 
-	if !chOK {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find message channel for client"})
-		return
-	}
-
-	// 使用select等待客户端消息或超时
+	// 使用select结构来等待客户端响应或超时
 	select {
-	case response := <-clientCh:
+	case response := <-clientCh: // 等待从客户端收到消息
 		c.JSON(http.StatusOK, gin.H{"status": "Message received from client", "response": response})
-	case <-time.After(timeoutDuration):
+	case <-time.After(timeoutDuration): // 等待超时
 		c.JSON(http.StatusRequestTimeout, gin.H{"error": "No response from client, timeout reached"})
+	}
+}
+
+// clearChannel 清理通道中所有待处理的消息
+func clearChannel(ch chan string) {
+	for {
+		select {
+		case <-ch:
+		// 从通道中读取并丢弃消息
+		default:
+			// 通道为空时，返回
+			return
+		}
 	}
 }
 
