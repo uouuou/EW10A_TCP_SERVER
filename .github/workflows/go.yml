@@ -20,7 +20,16 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: '1.21.6'
-
+    - name: Create release on GitHub 
+      uses: goreleaser/goreleaser-action@v2 
+      with: 
+        # GoReleaser 版本 
+        version: latest 
+        # 传递给 GoReleaser 的参数 
+        args: release --rm-dist 
+      env: 
+        # 提供访问仓库
+        token GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
     - name: Build
       run: go build -v ./...
 
